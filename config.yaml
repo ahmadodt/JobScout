@@ -1,0 +1,6 @@
+database:
+  path: jobscout.sqlite3
+
+collectors:
+  mock:
+    enabled: true
