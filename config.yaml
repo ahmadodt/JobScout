@@ -4,3 +4,5 @@ database:
 collectors:
   mock:
     enabled: true
+  bmw:
+    enabled: true

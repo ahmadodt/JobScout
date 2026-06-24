@@ -4,6 +4,7 @@ from pathlib import Path
 
 import yaml
 
+from collectors.bmw import BMWCollector
 from collectors.mock import MockCollector
 from database.db import connect, init_db
 from services.job_store import JobStore
@@ -14,6 +15,7 @@ CONFIG_PATH = ROOT_DIR / "config.yaml"
 
 AVAILABLE_COLLECTORS = {
     "mock": MockCollector,
+    "bmw": BMWCollector,
 }
 
 
