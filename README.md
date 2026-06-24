@@ -8,7 +8,10 @@ This first version intentionally keeps the scope small: no LLM scoring, embeddin
 
 ```bash
 pip install -r requirements.txt
+playwright install chromium
 ```
+
+BMW scraping uses Playwright because BMW's careers listings are rendered dynamically. The Chromium install command only needs to be run once per environment.
 
 ## Run Collection
 
