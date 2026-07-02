@@ -11,6 +11,11 @@ if str(ROOT_DIR) not in sys.path:
 
 from database.db import connect, init_db
 from services.job_store import JobStore
+from services.personal_connections import (
+    DEFAULT_CONNECTIONS_PATH,
+    find_company_connections,
+    load_personal_connections,
+)
 
 
 st.set_page_config(page_title="JobScout", layout="wide")
@@ -23,7 +28,19 @@ def get_store() -> JobStore:
     return JobStore(connection)
 
 
+@st.cache_data
+def get_personal_connections(last_modified: float | None) -> dict:
+    return load_personal_connections()
+
+
+def get_connections_file_mtime() -> float | None:
+    if not DEFAULT_CONNECTIONS_PATH.exists():
+        return None
+    return DEFAULT_CONNECTIONS_PATH.stat().st_mtime
+
+
 store = get_store()
+personal_connections = get_personal_connections(get_connections_file_mtime())
 filter_values = store.get_filter_values()
 
 st.title("JobScout")
@@ -52,6 +69,38 @@ for job in jobs:
         header, status_col = st.columns([4, 1])
         with header:
             st.subheader(job["title"])
+            company_connections = find_company_connections(
+                job["company"], personal_connections
+            )
+            if company_connections:
+                if company_connections.connections:
+                    connection_labels = []
+                    for connection in company_connections.connections:
+                        details = " - ".join(
+                            detail
+                            for detail in (
+                                connection.relationship,
+                                connection.notes,
+                            )
+                            if detail
+                        )
+                        label = connection.name
+                        if details:
+                            label = f"{label} ({details})"
+                        connection_labels.append(label)
+                    connection_text = ", ".join(connection_labels)
+                    if company_connections.notes:
+                        connection_text = (
+                            f"{connection_text} | {company_connections.notes}"
+                        )
+                    st.info(f"Personal connections: {connection_text}")
+                elif company_connections.notes:
+                    st.info(f"Personal connections: {company_connections.notes}")
+                else:
+                    st.info(
+                        "Personal connections: company is on your local list; "
+                        "add contact names in `personal_connections.json`."
+                    )
             st.write(f"{job['company']} · {job['location']} · {job['source']}")
         with status_col:
             st.write(f"Status: `{job['status']}`")

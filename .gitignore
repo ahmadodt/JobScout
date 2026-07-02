@@ -4,3 +4,4 @@ __pycache__/
 *.log
 jobscout.sqlite3
 .streamlit/
+personal_connections.json

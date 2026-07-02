@@ -1,0 +1,22 @@
+{
+  "companies": [
+    {
+      "company": "Meriton",
+      "aliases": [],
+      "connections": [
+        {
+          "name": "Example Person",
+          "relationship": "Former colleague",
+          "notes": "Can ask about referral options."
+        }
+      ],
+      "notes": ""
+    },
+    {
+      "company": "Accenture",
+      "aliases": ["Accentric"],
+      "connections": [],
+      "notes": "Add known contacts here."
+    }
+  ]
+}

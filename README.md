@@ -29,6 +29,12 @@ streamlit run ui/app.py
 
 The dashboard shows jobs newest first and supports filters for source, status, company, and keyword. Use the buttons on each job to mark it as relevant, ignored, or applied.
 
+## Personal Connections
+
+Private referral notes live in `personal_connections.json`. This file is ignored by git, so it stays local and should not be uploaded to GitHub.
+
+Use `personal_connections.example.json` as the schema. Add companies, aliases, and connection names there; matching job cards will show a "Personal connections" note in the dashboard.
+
 ## Configuration
 
 Collectors are controlled in `config.yaml`:
