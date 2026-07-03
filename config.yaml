@@ -8,3 +8,23 @@ collectors:
     enabled: true
   porsche:
     enabled: true
+  mercedes_benz:
+    enabled: true
+  volkswagen:
+    enabled: true
+  siemens:
+    enabled: true
+  sap:
+    enabled: true
+  allianz:
+    enabled: true
+  microsoft_germany:
+    enabled: true
+  google:
+    enabled: true
+  meta:
+    enabled: true
+  apple:
+    enabled: true
+  amazon:
+    enabled: true

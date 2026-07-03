@@ -4,9 +4,19 @@ from pathlib import Path
 
 import yaml
 
+from collectors.allianz import AllianzCollector
+from collectors.amazon import AmazonCollector
+from collectors.apple import AppleCollector
 from collectors.bmw import BMWCollector
+from collectors.google import GoogleCollector
+from collectors.mercedes_benz import MercedesBenzCollector
+from collectors.meta import MetaCollector
+from collectors.microsoft_germany import MicrosoftGermanyCollector
 from collectors.mock import MockCollector
 from collectors.porsche import PorscheCollector
+from collectors.sap import SAPCollector
+from collectors.siemens import SiemensCollector
+from collectors.volkswagen import VolkswagenCollector
 from database.db import connect, init_db
 from services.job_store import JobStore
 
@@ -18,6 +28,16 @@ AVAILABLE_COLLECTORS = {
     "mock": MockCollector,
     "bmw": BMWCollector,
     "porsche": PorscheCollector,
+    "mercedes_benz": MercedesBenzCollector,
+    "volkswagen": VolkswagenCollector,
+    "siemens": SiemensCollector,
+    "sap": SAPCollector,
+    "allianz": AllianzCollector,
+    "microsoft_germany": MicrosoftGermanyCollector,
+    "google": GoogleCollector,
+    "meta": MetaCollector,
+    "apple": AppleCollector,
+    "amazon": AmazonCollector,
 }
 
 
