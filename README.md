@@ -21,6 +21,14 @@ python run_collection.py
 
 The default `config.yaml` enables the mock collector, which returns 10 fake AI/LLM-related jobs. Jobs are stored in `jobscout.sqlite3`.
 
+## Run Scheduler
+
+```bash
+python run_scheduler.py
+```
+
+The scheduler keeps running until stopped with Ctrl+C. It runs collection every day at 8:00 AM and scoring every day at 8:30 AM, logging each run to `logs/scheduler.log`.
+
 ## Start Streamlit
 
 ```bash
