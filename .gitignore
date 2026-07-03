@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *.log
 logs/
+exports/
 jobscout.sqlite3
 .streamlit/
 personal_connections.json

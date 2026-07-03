@@ -41,6 +41,14 @@ JOBSCOUT_EMAIL_PASSWORD=your-gmail-app-password
 
 Gmail SMTP is used by default through `smtp.gmail.com:587`. For Gmail accounts, use an app password rather than your normal account password. If any email variable is missing, JobScout skips sending the email and writes a warning to `logs/scheduler.log`.
 
+## Export HTML Dashboard
+
+```bash
+python run_export.py
+```
+
+This writes a standalone HTML export to `exports/jobs_export.html` that can be opened directly in any browser without running Streamlit.
+
 ## Start Streamlit
 
 ```bash
