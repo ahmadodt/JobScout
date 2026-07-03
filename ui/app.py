@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import sys
 from pathlib import Path
@@ -51,12 +51,16 @@ with st.sidebar:
     status = st.selectbox("Status", ["All", *filter_values["status"]])
     company = st.selectbox("Company", ["All", *filter_values["company"]])
     keyword = st.text_input("Keyword")
+    sort_label = st.selectbox("Sort by", ["Newest first", "Score"])
+    min_score = st.slider("Minimum score", 1, 10, 1)
 
 jobs = store.list_jobs(
     source=None if source == "All" else source,
     status=None if status == "All" else status,
     company=None if company == "All" else company,
     keyword=keyword.strip() or None,
+    sort_by="score" if sort_label == "Score" else "newest",
+    min_score=min_score,
 )
 
 st.caption(f"{len(jobs)} jobs")
@@ -101,9 +105,13 @@ for job in jobs:
                         "Personal connections: company is on your local list; "
                         "add contact names in `personal_connections.json`."
                     )
-            st.write(f"{job['company']} · {job['location']} · {job['source']}")
+            st.write(f"{job['company']} - {job['location']} - {job['source']}")
         with status_col:
             st.write(f"Status: `{job['status']}`")
+            if job["score"] is not None:
+                st.write(f"Score: {job['score']}/10")
+                if job["score_reason"]:
+                    st.caption(job["score_reason"])
 
         st.write(job["description"])
         st.markdown(f"[Open job posting]({job['url']})")
