@@ -20,3 +20,11 @@ CREATE INDEX IF NOT EXISTS idx_jobs_source ON jobs(source);
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 CREATE INDEX IF NOT EXISTS idx_jobs_company ON jobs(company);
 CREATE INDEX IF NOT EXISTS idx_jobs_date_collected ON jobs(date_collected);
+
+CREATE TABLE IF NOT EXISTS company_watchlist (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    careers_url TEXT,
+    added_at TEXT DEFAULT (datetime('now')),
+    active INTEGER DEFAULT 1
+);

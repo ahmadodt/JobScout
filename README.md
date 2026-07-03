@@ -49,6 +49,14 @@ python run_export.py
 
 This writes a standalone HTML export to `exports/jobs_export.html` that can be opened directly in any browser without running Streamlit.
 
+## Cleanup Jobs
+
+```bash
+python run_cleanup.py
+```
+
+This prints a duplicate and stale-job report, asks for confirmation, deletes duplicate jobs, and archives stale unreviewed jobs as ignored.
+
 ## Start Streamlit
 
 ```bash

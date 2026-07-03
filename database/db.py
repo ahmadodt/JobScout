@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
@@ -20,6 +20,7 @@ def init_db(connection: sqlite3.Connection) -> None:
     schema = SCHEMA_PATH.read_text(encoding="utf-8")
     connection.executescript(schema)
     _ensure_score_columns(connection)
+    _ensure_company_watchlist_table(connection)
     connection.commit()
 
 
@@ -31,3 +32,17 @@ def _ensure_score_columns(connection: sqlite3.Connection) -> None:
         connection.execute("ALTER TABLE jobs ADD COLUMN score INTEGER")
     if "score_reason" not in existing_columns:
         connection.execute("ALTER TABLE jobs ADD COLUMN score_reason TEXT")
+
+
+def _ensure_company_watchlist_table(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS company_watchlist (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            careers_url TEXT,
+            added_at TEXT DEFAULT (datetime('now')),
+            active INTEGER DEFAULT 1
+        )
+        """
+    )
