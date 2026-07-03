@@ -6,3 +6,5 @@ collectors:
     enabled: true
   bmw:
     enabled: true
+  porsche:
+    enabled: true

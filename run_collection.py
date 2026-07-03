@@ -6,6 +6,7 @@ import yaml
 
 from collectors.bmw import BMWCollector
 from collectors.mock import MockCollector
+from collectors.porsche import PorscheCollector
 from database.db import connect, init_db
 from services.job_store import JobStore
 
@@ -16,6 +17,7 @@ CONFIG_PATH = ROOT_DIR / "config.yaml"
 AVAILABLE_COLLECTORS = {
     "mock": MockCollector,
     "bmw": BMWCollector,
+    "porsche": PorscheCollector,
 }
 
 
