@@ -1,5 +1,6 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
+import re
 import subprocess
 import sys
 import time
@@ -8,10 +9,13 @@ from pathlib import Path
 
 import schedule
 
+from services.notifier import send_daily_summary
+
 
 ROOT_DIR = Path(__file__).resolve().parent
 LOG_DIR = ROOT_DIR / "logs"
 LOG_PATH = LOG_DIR / "scheduler.log"
+LAST_NEW_JOBS_COUNT = 0
 
 
 def log(message: str) -> None:
@@ -23,7 +27,7 @@ def log(message: str) -> None:
         file.write(f"{line}\n")
 
 
-def run_script(script_name: str, label: str) -> None:
+def run_script(script_name: str, label: str) -> subprocess.CompletedProcess[str]:
     log(f"{label} started")
     result = subprocess.run(
         [sys.executable, script_name],
@@ -44,13 +48,35 @@ def run_script(script_name: str, label: str) -> None:
     else:
         log(f"{label} failed with exit code {result.returncode}")
 
+    return result
+
 
 def run_collection() -> None:
-    run_script("run_collection.py", "Collection")
+    global LAST_NEW_JOBS_COUNT
+
+    result = run_script("run_collection.py", "Collection")
+    if result.returncode == 0:
+        LAST_NEW_JOBS_COUNT = _parse_count(result.stdout, r"Total new:\s*(\d+)")
 
 
 def run_scoring() -> None:
-    run_script("run_scoring.py", "Scoring")
+    result = run_script("run_scoring.py", "Scoring")
+    scored_jobs_count = 0
+    if result.returncode == 0:
+        scored_jobs_count = _parse_count(result.stdout, r"Scored\s+(\d+)\s+jobs")
+
+    send_daily_summary(
+        new_jobs_count=LAST_NEW_JOBS_COUNT,
+        scored_jobs_count=scored_jobs_count,
+        logger=log,
+    )
+
+
+def _parse_count(output: str, pattern: str) -> int:
+    match = re.search(pattern, output)
+    if not match:
+        return 0
+    return int(match.group(1))
 
 
 def main() -> None:

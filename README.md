@@ -2,8 +2,6 @@
 
 JobScout is a small personal job-search dashboard. It collects jobs from configurable sources, deduplicates them, stores them in SQLite, and displays them in Streamlit.
 
-This first version intentionally keeps the scope small: no LLM scoring, embeddings, login handling, or scheduling.
-
 ## Setup
 
 ```bash
@@ -28,6 +26,20 @@ python run_scheduler.py
 ```
 
 The scheduler keeps running until stopped with Ctrl+C. It runs collection every day at 8:00 AM and scoring every day at 8:30 AM, logging each run to `logs/scheduler.log`.
+
+## Email Notifications
+
+Scheduled scoring sends a daily summary email after the scoring run completes. The email includes the number of new jobs collected, the number of jobs scored, and the top 5 highest scoring jobs.
+
+Set these environment variables before starting the scheduler:
+
+```bash
+JOBSCOUT_EMAIL_FROM=your-email@gmail.com
+JOBSCOUT_EMAIL_TO=recipient@example.com
+JOBSCOUT_EMAIL_PASSWORD=your-gmail-app-password
+```
+
+Gmail SMTP is used by default through `smtp.gmail.com:587`. For Gmail accounts, use an app password rather than your normal account password. If any email variable is missing, JobScout skips sending the email and writes a warning to `logs/scheduler.log`.
 
 ## Start Streamlit
 
