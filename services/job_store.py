@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import sqlite3
 
@@ -58,9 +58,11 @@ class JobStore:
         status: str | None = None,
         company: str | None = None,
         keyword: str | None = None,
+        sort_by: str = "newest",
+        min_score: int | None = None,
     ) -> list[sqlite3.Row]:
         where_clauses = []
-        params: list[str] = []
+        params: list[str | int] = []
 
         if source:
             where_clauses.append("source = ?")
@@ -77,14 +79,29 @@ class JobStore:
             )
             pattern = f"%{keyword}%"
             params.extend([pattern, pattern, pattern, pattern])
+        if min_score is not None and min_score > 1:
+            where_clauses.append("score >= ?")
+            params.append(min_score)
 
         where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+        if sort_by == "score":
+            order_sql = """
+            CASE WHEN score IS NULL THEN 1 ELSE 0 END,
+            score DESC,
+            datetime(date_collected) DESC,
+            id DESC
+            """
+        elif sort_by == "newest":
+            order_sql = "datetime(date_collected) DESC, id DESC"
+        else:
+            raise ValueError(f"Unsupported sort option: {sort_by}")
+
         cursor = self.connection.execute(
             f"""
             SELECT *
             FROM jobs
             {where_sql}
-            ORDER BY datetime(date_collected) DESC, id DESC
+            ORDER BY {order_sql}
             """,
             params,
         )
@@ -101,6 +118,17 @@ class JobStore:
             WHERE id = ?
             """,
             (status, job_id),
+        )
+        self.connection.commit()
+
+    def update_score(self, job_id: int, score: int, reason: str) -> None:
+        self.connection.execute(
+            """
+            UPDATE jobs
+            SET score = ?, score_reason = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (score, reason, job_id),
         )
         self.connection.commit()
 

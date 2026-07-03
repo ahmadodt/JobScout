@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS jobs (
+﻿CREATE TABLE IF NOT EXISTS jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     company TEXT NOT NULL,
@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS jobs (
     date_collected TEXT NOT NULL,
     dedupe_key TEXT NOT NULL UNIQUE,
     status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'relevant', 'ignored', 'applied')),
+    score INTEGER,
+    score_reason TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

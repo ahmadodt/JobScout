@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
@@ -19,4 +19,15 @@ def connect(db_path: str | Path | None = None) -> sqlite3.Connection:
 def init_db(connection: sqlite3.Connection) -> None:
     schema = SCHEMA_PATH.read_text(encoding="utf-8")
     connection.executescript(schema)
+    _ensure_score_columns(connection)
     connection.commit()
+
+
+def _ensure_score_columns(connection: sqlite3.Connection) -> None:
+    cursor = connection.execute("PRAGMA table_info(jobs)")
+    existing_columns = {row["name"] for row in cursor.fetchall()}
+
+    if "score" not in existing_columns:
+        connection.execute("ALTER TABLE jobs ADD COLUMN score INTEGER")
+    if "score_reason" not in existing_columns:
+        connection.execute("ALTER TABLE jobs ADD COLUMN score_reason TEXT")
