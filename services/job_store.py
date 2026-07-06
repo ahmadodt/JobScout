@@ -7,6 +7,7 @@ from services.deduplicator import make_dedupe_key
 
 
 VALID_STATUSES = {"new", "relevant", "ignored", "applied"}
+VALID_SCORE_SOURCES = {"ai", "manual"}
 
 
 class JobStore:
@@ -121,14 +122,26 @@ class JobStore:
         )
         self.connection.commit()
 
-    def update_score(self, job_id: int, score: int, reason: str) -> None:
+    def update_score(
+        self,
+        job_id: int,
+        score: int,
+        reason: str,
+        source: str = "ai",
+    ) -> None:
+        if source not in VALID_SCORE_SOURCES:
+            raise ValueError(f"Unsupported score source: {source}")
+        if not 1 <= score <= 10:
+            raise ValueError(f"Score must be between 1 and 10, got {score}")
+
         self.connection.execute(
             """
             UPDATE jobs
-            SET score = ?, score_reason = ?, updated_at = CURRENT_TIMESTAMP
+            SET score = ?, score_reason = ?, score_source = ?,
+                updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
             """,
-            (score, reason, job_id),
+            (score, reason, source, job_id),
         )
         self.connection.commit()
 

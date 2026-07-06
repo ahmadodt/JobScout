@@ -12,6 +12,7 @@
     status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'relevant', 'ignored', 'applied')),
     score INTEGER,
     score_reason TEXT,
+    score_source TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

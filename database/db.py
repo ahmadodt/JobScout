@@ -32,6 +32,12 @@ def _ensure_score_columns(connection: sqlite3.Connection) -> None:
         connection.execute("ALTER TABLE jobs ADD COLUMN score INTEGER")
     if "score_reason" not in existing_columns:
         connection.execute("ALTER TABLE jobs ADD COLUMN score_reason TEXT")
+    if "score_source" not in existing_columns:
+        connection.execute("ALTER TABLE jobs ADD COLUMN score_source TEXT")
+        connection.execute(
+            "UPDATE jobs SET score_source = 'ai' "
+            "WHERE score IS NOT NULL AND score_source IS NULL"
+        )
 
 
 def _ensure_company_watchlist_table(connection: sqlite3.Connection) -> None:
