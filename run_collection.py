@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-import yaml
+from datetime import date, timedelta
 
 from collectors.allianz import AllianzCollector
 from collectors.amazon import AmazonCollector
@@ -18,11 +16,9 @@ from collectors.sap import SAPCollector
 from collectors.siemens import SiemensCollector
 from collectors.volkswagen import VolkswagenCollector
 from database.db import connect, init_db
+from services.config import load_config, resolve_db_path
 from services.job_store import JobStore
 
-
-ROOT_DIR = Path(__file__).resolve().parent
-CONFIG_PATH = ROOT_DIR / "config.yaml"
 
 AVAILABLE_COLLECTORS = {
     "mock": MockCollector,
@@ -41,22 +37,29 @@ AVAILABLE_COLLECTORS = {
 }
 
 
-def load_config() -> dict:
-    with CONFIG_PATH.open("r", encoding="utf-8") as file:
-        return yaml.safe_load(file) or {}
+def _is_within_lookback(date_posted: str | None, cutoff: date) -> bool:
+    if not date_posted:
+        return True
+    try:
+        posted = date.fromisoformat(date_posted[:10])
+    except ValueError:
+        return True
+    return posted >= cutoff
 
 
 def main() -> None:
     config = load_config()
-    db_path = config.get("database", {}).get("path", "jobscout.sqlite3")
-    collectors_config = config.get("collectors", {})
+    collectors_config = config["collectors"]
+    lookback_days = config["collection"]["lookback_days"]
+    cutoff = date.today() - timedelta(days=lookback_days)
 
-    connection = connect(ROOT_DIR / db_path)
+    connection = connect(resolve_db_path(config))
     init_db(connection)
     store = JobStore(connection)
 
     total_collected = 0
     total_new = 0
+    total_skipped = 0
 
     for name, collector_class in AVAILABLE_COLLECTORS.items():
         collector_config = collectors_config.get(name, {})
@@ -65,13 +68,20 @@ def main() -> None:
 
         collector = collector_class()
         jobs = collector.collect()
-        new_count = store.insert_jobs(jobs)
+        recent_jobs = [job for job in jobs if _is_within_lookback(job.date_posted, cutoff)]
+        skipped = len(jobs) - len(recent_jobs)
+        new_count = store.insert_jobs(recent_jobs)
 
         total_collected += len(jobs)
         total_new += new_count
-        print(f"{name}: collected {len(jobs)} jobs, inserted {new_count} new jobs")
+        total_skipped += skipped
+        message = f"{name}: collected {len(jobs)} jobs, inserted {new_count} new jobs"
+        if skipped:
+            message += f", skipped {skipped} older than {lookback_days} days"
+        print(message)
 
     print(f"Total collected: {total_collected}")
+    print(f"Total skipped (older than {lookback_days} days): {total_skipped}")
     print(f"Total new: {total_new}")
 
 
