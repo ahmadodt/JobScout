@@ -1,9 +1,22 @@
 database:
   path: jobscout.sqlite3
 
+schedule:
+  collection_time: "08:00"
+  scoring_time: "08:30"
+
+scoring:
+  ai_enabled: false
+
+collection:
+  lookback_days: 30
+
+cleanup:
+  stale_days: 30
+
 collectors:
   mock:
-    enabled: true
+    enabled: false
   bmw:
     enabled: true
   porsche:

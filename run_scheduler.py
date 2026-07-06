@@ -9,6 +9,7 @@ from pathlib import Path
 
 import schedule
 
+from services.config import DEFAULTS, load_config
 from services.notifier import send_daily_summary
 
 
@@ -79,14 +80,36 @@ def _parse_count(output: str, pattern: str) -> int:
     return int(match.group(1))
 
 
+def _validated_time(value: str, default: str) -> str:
+    if isinstance(value, str) and re.fullmatch(r"\d{2}:\d{2}", value):
+        hours, minutes = value.split(":")
+        if int(hours) < 24 and int(minutes) < 60:
+            return value
+    log(f"Invalid schedule time {value!r} in config.yaml, falling back to {default}")
+    return default
+
+
 def main() -> None:
     LOG_DIR.mkdir(exist_ok=True)
-    schedule.every().day.at("08:00").do(run_collection)
-    schedule.every().day.at("08:30").do(run_scoring)
+    config = load_config()
+    schedule_config = config["schedule"]
+    defaults = DEFAULTS["schedule"]
+
+    collection_time = _validated_time(
+        schedule_config["collection_time"], defaults["collection_time"]
+    )
+    scoring_time = _validated_time(
+        schedule_config["scoring_time"], defaults["scoring_time"]
+    )
+
+    schedule.every().day.at(collection_time).do(run_collection)
+    schedule.every().day.at(scoring_time).do(run_scoring)
 
     log("Scheduler started")
-    log("Collection scheduled daily at 08:00")
-    log("Scoring scheduled daily at 08:30")
+    log(f"Collection scheduled daily at {collection_time}")
+    log(f"Scoring scheduled daily at {scoring_time}")
+    if not config["scoring"]["ai_enabled"]:
+        log("AI scoring disabled in config.yaml - scoring run will be a no-op")
 
     try:
         while True:
