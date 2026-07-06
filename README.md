@@ -17,7 +17,7 @@ BMW scraping uses Playwright because BMW's careers listings are rendered dynamic
 python run_collection.py
 ```
 
-The default `config.yaml` enables the mock collector, which returns 10 fake AI/LLM-related jobs. Jobs are stored in `jobscout.sqlite3`.
+Jobs are stored in `jobscout.sqlite3`. Collection skips jobs whose posting date is older than `collection.lookback_days` (default 30) in `config.yaml`; jobs without a posting date are always kept. The mock collector (10 fake jobs for testing) is disabled by default.
 
 ## Run Scheduler
 
@@ -25,7 +25,13 @@ The default `config.yaml` enables the mock collector, which returns 10 fake AI/L
 python run_scheduler.py
 ```
 
-The scheduler keeps running until stopped with Ctrl+C. It runs collection every day at 8:00 AM and scoring every day at 8:30 AM, logging each run to `logs/scheduler.log`.
+The scheduler keeps running until stopped with Ctrl+C. It runs collection and scoring daily at the times set in `config.yaml` (`schedule.collection_time` / `schedule.scoring_time`, defaults 08:00 and 08:30), logging each run to `logs/scheduler.log`. Restart the scheduler after changing the times.
+
+## Scoring
+
+AI scoring with Claude is controlled by `scoring.ai_enabled` in `config.yaml` (default `false`). When disabled, `python run_scoring.py` is a no-op. When enabled, it requires the `ANTHROPIC_API_KEY` environment variable and scores only jobs that have no score yet; jobs whose scoring fails stay unscored and are retried on the next run.
+
+You can also score jobs manually in the dashboard: open the "Manual score" section on a job card, pick a 1-10 score and an optional note. Manually scored jobs are never overwritten by AI scoring. All of the settings above (schedule times, AI toggle, lookback window, stale-job days) can be edited on the dashboard's Settings page, which also shows which environment variables are missing.
 
 ## Email Notifications
 
