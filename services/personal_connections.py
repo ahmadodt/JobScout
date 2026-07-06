@@ -10,6 +10,10 @@ from typing import Any
 DEFAULT_CONNECTIONS_PATH = Path(__file__).resolve().parents[1] / "personal_connections.json"
 
 
+class PersonalConnectionsError(Exception):
+    """Raised when personal_connections.json cannot be read or parsed."""
+
+
 @dataclass(frozen=True)
 class PersonalConnection:
     name: str
@@ -35,8 +39,11 @@ def load_personal_connections(
     if not path.exists():
         return {}
 
-    with path.open("r", encoding="utf-8") as file:
-        payload = json.load(file)
+    try:
+        with path.open("r", encoding="utf-8") as file:
+            payload = json.load(file)
+    except (json.JSONDecodeError, OSError) as exc:
+        raise PersonalConnectionsError(str(exc)) from exc
 
     index: dict[str, CompanyConnections] = {}
     for item in payload.get("companies", []):
