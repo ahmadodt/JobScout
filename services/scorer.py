@@ -18,7 +18,7 @@ def score_job(
     company: str,
     location: str,
     description: str,
-) -> tuple[int, str]:
+) -> tuple[int, str] | None:
     try:
         client = Anthropic()
         response = client.messages.create(
@@ -43,7 +43,8 @@ def score_job(
 
         return score, reason
     except Exception:
-        return 0, "scoring failed"
+        # Leave the job unscored so the next scoring run retries it.
+        return None
 
 
 def _format_job(

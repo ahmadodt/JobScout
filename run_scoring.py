@@ -1,28 +1,20 @@
-﻿from __future__ import annotations
-
-from pathlib import Path
-
-import yaml
+from __future__ import annotations
 
 from database.db import connect, init_db
+from services.config import load_config, resolve_db_path
 from services.job_store import JobStore
 from services.scorer import score_job
 
 
-ROOT_DIR = Path(__file__).resolve().parent
-CONFIG_PATH = ROOT_DIR / "config.yaml"
-
-
-def load_config() -> dict:
-    with CONFIG_PATH.open("r", encoding="utf-8") as file:
-        return yaml.safe_load(file) or {}
-
-
 def main() -> None:
     config = load_config()
-    db_path = config.get("database", {}).get("path", "jobscout.sqlite3")
 
-    connection = connect(ROOT_DIR / db_path)
+    if not config["scoring"]["ai_enabled"]:
+        print("AI scoring disabled in config.yaml (scoring.ai_enabled: false)")
+        print("Scored 0 jobs")
+        return
+
+    connection = connect(resolve_db_path(config))
     init_db(connection)
     store = JobStore(connection)
 
@@ -37,18 +29,29 @@ def main() -> None:
         ).fetchall()
     )
     total = len(jobs)
+    scored = 0
+    failed = 0
 
     for index, job in enumerate(jobs, start=1):
         print(f"Scoring job {index} of {total}: {job['title']}")
-        score, reason = score_job(
+        result = score_job(
             title=job["title"],
             company=job["company"],
             location=job["location"],
             description=job["description"],
         )
-        store.update_score(job["id"], score, reason)
+        if result is None:
+            failed += 1
+            print(f"Scoring failed for job {job['id']}, will retry next run")
+            continue
 
-    print(f"Scored {total} jobs")
+        score, reason = result
+        store.update_score(job["id"], score, reason, source="ai")
+        scored += 1
+
+    print(f"Scored {scored} jobs")
+    if failed:
+        print(f"Failed {failed} jobs (left unscored for retry)")
 
 
 if __name__ == "__main__":
