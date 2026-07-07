@@ -45,7 +45,7 @@ collectors:
     enabled: true
   # Config-driven ATS boards: add a company by adding a slug here (no code needed).
   # locations: optional substring allow-list applied to the job's location field.
-  # Not on these platforms (verified 2026-07): deepl, alephalpha, cohere,
+  # Not on these platforms (verified 2026-07): deepl, cohere,
   # huggingface, perplexityai - would need their own collectors.
   greenhouse:
     enabled: true
@@ -71,3 +71,4 @@ collectors:
       - {slug: langchain, company: LangChain}
       - {slug: n8n, company: n8n}
       - {slug: weaviate, company: Weaviate}
+      - {slug: alephalpha, company: Aleph Alpha}
