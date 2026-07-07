@@ -15,7 +15,7 @@ class JobStore:
         self.connection = connection
 
     def insert_job(self, job: Job) -> bool:
-        dedupe_key = make_dedupe_key(job.company, job.title)
+        dedupe_key = make_dedupe_key(job.company, job.title, job.location)
         cursor = self.connection.execute(
             """
             INSERT OR IGNORE INTO jobs (

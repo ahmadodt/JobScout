@@ -9,5 +9,5 @@ def normalize_text(value: str) -> str:
     return re.sub(r"\s+", " ", normalized).strip()
 
 
-def make_dedupe_key(company: str, title: str) -> str:
-    return f"{normalize_text(company)}::{normalize_text(title)}"
+def make_dedupe_key(company: str, title: str, location: str = "") -> str:
+    return f"{normalize_text(company)}::{normalize_text(title)}::{normalize_text(location)}"
