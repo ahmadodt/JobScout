@@ -64,6 +64,10 @@ def main() -> None:
     if not args.all and not args.name:
         parser.error("give a collector name or --all")
 
+    # Job titles often contain characters the Windows console codepage can't encode.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
     )
