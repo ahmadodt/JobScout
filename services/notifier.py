@@ -27,6 +27,52 @@ def send_daily_summary(
     scored_jobs_count: int,
     logger: Callable[[str], None] | None = None,
 ) -> bool:
+    top_jobs = _get_top_scoring_jobs()
+    health = _get_collection_health()
+    failures = sum(1 for entry in health if entry["status"] == "error")
+
+    subject = "JobScout daily summary"
+    if failures:
+        plural = "s" if failures != 1 else ""
+        subject += f" - {failures} collector failure{plural}"
+
+    body = _build_summary_body(new_jobs_count, scored_jobs_count, top_jobs, health)
+    return _send_email(subject, body, logger)
+
+
+def send_failure_alert(logger: Callable[[str], None] | None = None) -> bool:
+    """Send an immediate email if any of today's collection runs failed.
+
+    Returns True only when an alert was actually sent.
+    """
+    failures = [
+        entry for entry in _get_collection_health() if entry["status"] == "error"
+    ]
+    if not failures:
+        return False
+
+    plural = "s" if len(failures) != 1 else ""
+    subject = f"JobScout ALERT - {len(failures)} collector failure{plural}"
+    lines = [
+        "The following collectors failed during today's collection run:",
+        "",
+    ]
+    for entry in failures:
+        lines.append(f"[FAILED] {entry['source']}: {entry['error_message']}")
+    lines.extend(
+        [
+            "",
+            "Diagnose with: python run_collector_check.py <source>",
+        ]
+    )
+    return _send_email(subject, "\n".join(lines), logger)
+
+
+def _send_email(
+    subject: str,
+    body: str,
+    logger: Callable[[str], None] | None = None,
+) -> bool:
     missing_vars = [name for name in REQUIRED_ENV_VARS if not os.getenv(name)]
     if missing_vars:
         _log(
@@ -39,22 +85,12 @@ def send_daily_summary(
     sender = os.environ["JOBSCOUT_EMAIL_FROM"]
     recipient = os.environ["JOBSCOUT_EMAIL_TO"]
     password = os.environ["JOBSCOUT_EMAIL_PASSWORD"]
-    top_jobs = _get_top_scoring_jobs()
-    health = _get_collection_health()
-    failures = sum(1 for entry in health if entry["status"] == "error")
-
-    subject = "JobScout daily summary"
-    if failures:
-        plural = "s" if failures != 1 else ""
-        subject += f" - {failures} collector failure{plural}"
 
     message = EmailMessage()
     message["Subject"] = subject
     message["From"] = sender
     message["To"] = recipient
-    message.set_content(
-        _build_summary_body(new_jobs_count, scored_jobs_count, top_jobs, health)
-    )
+    message.set_content(body)
 
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as smtp:

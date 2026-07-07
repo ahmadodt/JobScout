@@ -10,7 +10,7 @@ from pathlib import Path
 import schedule
 
 from services.config import DEFAULTS, load_config
-from services.notifier import send_daily_summary
+from services.notifier import send_daily_summary, send_failure_alert
 
 
 ROOT_DIR = Path(__file__).resolve().parent
@@ -58,6 +58,10 @@ def run_collection() -> None:
     result = run_script("run_collection.py", "Collection")
     if result.returncode == 0:
         LAST_NEW_JOBS_COUNT = _parse_count(result.stdout, r"Total new:\s*(\d+)")
+
+    # Alert immediately on per-collector failures instead of waiting for
+    # the daily summary email.
+    send_failure_alert(logger=log)
 
 
 def run_scoring() -> None:
