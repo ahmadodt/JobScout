@@ -8,271 +8,99 @@ from urllib.parse import urljoin
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from collectors.base import Job, utc_now_iso
+from collectors.base import Job, clean_text, utc_now_iso
+from collectors.http_base import HttpCollectorBase
 
 
-SIEMENS_COMPANY = "Siemens"
-SIEMENS_SOURCE = "siemens"
-SIEMENS_CAREERS_URL = "https://jobs.siemens.com/careers"
-SIEMENS_SEARCH_URLS = (
-    "https://jobs.siemens.com/careers?query=agent&location=Germany",
-    "https://jobs.siemens.com/careers?query=llm&location=Germany",
-    "https://jobs.siemens.com/careers?query=rag&location=Germany",
+# Siemens runs an Avature career site; SearchJobs/{keyword} is server-rendered
+# and job rows link to /JobDetail/{id}.
+BASE_URL = "https://jobs.siemens.com"
+SEARCH_URL = "https://jobs.siemens.com/en_US/externaljobs/SearchJobs/{keyword}"
+MAX_DETAIL_PAGES = 40
+COUNTRY_PATTERN = re.compile(
+    r"\b(Germany|United States of America|United Kingdom|India|China|Thailand|"
+    r"Singapore|Japan|South Korea|Korea|France|Spain|Italy|Austria|Switzerland|"
+    r"Netherlands|Belgium|Portugal|Poland|Czechia|Hungary|Romania|Brazil|Mexico|"
+    r"Canada|Australia|Turkiye|Turkey|Denmark|Sweden|Norway|Finland)\b"
 )
-SIEMENS_JOB_DOMAINS = ('jobs.siemens.com',)
-KEYWORDS = ("rag", "llm", "agent")
 
 
-class SiemensCollector:
-    name = SIEMENS_SOURCE
+class SiemensCollector(HttpCollectorBase):
+    name = "siemens"
+    company = "Siemens"
 
-    def __init__(self, timeout_ms: int = 45000, filter_keywords: bool = True):
-        self.timeout_ms = timeout_ms
-        self.filter_keywords = filter_keywords
-
-    def collect(self) -> list[Job]:
-        try:
-            from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
-            from playwright.sync_api import sync_playwright
-        except ImportError as exc:
-            raise RuntimeError(
-                "SiemensCollector requires Playwright. Install it with "
-                "`pip install playwright` and then run `playwright install chromium`."
-            ) from exc
+    def fetch_jobs(self) -> list[Job]:
+        from bs4 import BeautifulSoup
 
         collected_at = utc_now_iso()
-        jobs: list[Job] = []
-        seen_urls: set[str] = set()
+        titles_by_url: dict[str, str] = {}
 
-        with sync_playwright() as playwright:
-            browser = playwright.chromium.launch(headless=True)
-            page = browser.new_page()
-            detail_page = browser.new_page()
-
-            for search_url in SIEMENS_SEARCH_URLS:
-                try:
-                    page.goto(search_url, wait_until="domcontentloaded", timeout=self.timeout_ms)
-                    self._wait_for_job_content(page, PlaywrightTimeoutError)
-                except Exception:
+        for keyword in self.keywords:
+            html = self._get_html(SEARCH_URL.format(keyword=keyword))
+            soup = BeautifulSoup(html, "html.parser")
+            for anchor in soup.select("a[href]"):
+                href = anchor.get("href", "")
+                if "/JobDetail/" not in href:
                     continue
+                url = urljoin(BASE_URL, href)
+                title = clean_text(anchor.get_text(" "))
+                # Each row links twice ("<title>" and "Learn more"); keep the longer text.
+                if len(title) > len(titles_by_url.get(url, "")):
+                    titles_by_url[url] = title
 
-                for listing in self._extract_listing_links(page, search_url):
-                    url = listing["url"]
-                    if not url or url in seen_urls:
-                        continue
-                    seen_urls.add(url)
-
-                    detail = self._extract_detail_page(detail_page, url)
-                    if not detail:
-                        continue
-
-                    description = detail["description"]
-                    combined_text = " ".join(
-                        part or ""
-                        for part in (
-                            detail["title"],
-                            detail["location"],
-                            description,
-                        )
-                    )
-                    if self.filter_keywords and not self._contains_keyword(combined_text):
-                        continue
-
-                    jobs.append(
-                        Job(
-                            title=detail["title"] or listing["title"],
-                            company=SIEMENS_COMPANY,
-                            location=detail["location"] or listing["location"],
-                            source=self.name,
-                            url=url,
-                            description=description,
-                            date_posted=detail["date_posted"] or listing["date_posted"],
-                            date_collected=collected_at,
-                        )
-                    )
-
-            browser.close()
-
-        return self._dedupe_by_url(jobs)
-
-    def _wait_for_job_content(self, page, timeout_error) -> None:
-        selectors = [
-            "a[href*='job']",
-            "a[href*='career']",
-            "[class*='job'] a[href]",
-            "[class*='career'] a[href]",
-            "[data-testid*='job'] a[href]",
-        ]
-
-        for selector in selectors:
-            try:
-                page.wait_for_selector(selector, timeout=self.timeout_ms)
-                return
-            except timeout_error:
+        jobs = []
+        for url, title in list(titles_by_url.items())[:MAX_DETAIL_PAGES]:
+            if not title or title.lower() == "learn more":
                 continue
-
-    def _extract_listing_links(self, page, base_url: str) -> list[dict[str, str | None]]:
-        links = page.locator("a[href]").evaluate_all(
-            """
-            (anchors) => anchors.map((anchor) => {
-                const container =
-                    anchor.closest("article, li, tr, [role='listitem'], [data-testid*='job'], .job, [class*='job'], [class*='result'], [class*='card']") ||
-                    anchor;
-                return {
-                    title: (anchor.innerText || anchor.textContent || "").trim(),
-                    url: anchor.href || anchor.getAttribute("href") || "",
-                    text: (container.innerText || "").trim()
-                };
-            })
-            """
-        )
-
-        listings = []
-        seen_urls = set()
-
-        for link in links:
-            url = urljoin(base_url, link.get("url", ""))
-            title = self._clean_text(link.get("title", ""))
-            listing_text = self._clean_text(link.get("text", ""))
-
-            if not self._looks_like_job_url(url, title):
-                continue
-            if url in seen_urls:
-                continue
-
-            listings.append(
-                {
-                    "title": title,
-                    "url": url,
-                    "location": self._extract_location(listing_text),
-                    "date_posted": self._extract_date_posted(listing_text),
-                }
+            detail = self._fetch_detail(url, title)
+            jobs.append(
+                Job(
+                    title=title,
+                    company=self.company,
+                    location=detail["location"],
+                    source=self.name,
+                    url=url,
+                    description=detail["description"],
+                    date_posted=None,
+                    date_collected=collected_at,
+                )
             )
-            seen_urls.add(url)
+        return jobs
 
-        return listings
+    def _fetch_detail(self, url: str, title: str = "") -> dict[str, str]:
+        from bs4 import BeautifulSoup
 
-    def _extract_detail_page(self, page, url: str) -> dict[str, str | None] | None:
-        detail_timeout_ms = min(self.timeout_ms, 15000)
         try:
-            page.goto(url, wait_until="domcontentloaded", timeout=detail_timeout_ms)
-            page.wait_for_selector("body", timeout=detail_timeout_ms)
+            html = self._get_html(url)
         except Exception:
-            return None
+            self.logger.warning("detail page failed: %s", url, exc_info=True)
+            return {"location": "", "description": ""}
 
-        detail = page.evaluate(
-            """
-            () => {
-                const content =
-                    document.querySelector("[class*='jobdetail']") ||
-                    document.querySelector("[class*='job-detail']") ||
-                    document.querySelector("[class*='jobDescription']") ||
-                    document.querySelector("[class*='job-description']") ||
-                    document.querySelector("[data-testid*='job']") ||
-                    document.querySelector("main") ||
-                    document.querySelector("article") ||
-                    document.body;
-                const heading = content.querySelector("h1, h2") || document.querySelector("h1, h2");
-                return {
-                    title: heading ? heading.innerText.trim() : "",
-                    description: content.innerText.trim(),
-                    text: content.innerText.trim()
-                };
-            }
-            """
-        )
+        soup = BeautifulSoup(html, "html.parser")
+        content = soup.select_one("main") or soup.body
+        text = clean_text(content.get_text(" ")) if content else ""
 
-        description = self._clean_text(detail.get("description", ""))
-        return {
-            "title": self._clean_text(detail.get("title", "")),
-            "location": self._extract_location(self._clean_text(detail.get("text", ""))),
-            "description": description,
-            "date_posted": self._extract_date_posted(description),
-        }
+        # The detail page renders "Location(s) <City> - <Region> - <Country>"
+        # followed immediately by the job title repeating.
+        location = ""
+        match = re.search(r"Location\(?s?\)?\s*:?\s*(.{0,120})", text)
+        if match:
+            candidate = match.group(1)
+            title_start = candidate.find(title[:15]) if title else -1
+            if title_start > 0:
+                candidate = candidate[:title_start]
+            # "City - Region - Country ..." - cut after the first country name.
+            country_match = COUNTRY_PATTERN.search(candidate)
+            if country_match:
+                candidate = candidate[: country_match.end()]
+            location = clean_text(candidate)[:80].strip(" -")
 
-    @staticmethod
-    def _contains_keyword(text: str) -> bool:
-        return any(
-            re.search(rf"(?<![a-z0-9]){re.escape(keyword)}(?![a-z0-9])", text, re.IGNORECASE)
-            for keyword in KEYWORDS
-        )
-
-    @staticmethod
-    def _clean_text(value: str | None) -> str:
-        return " ".join((value or "").split())
-
-    @staticmethod
-    def _looks_like_job_url(url: str, title: str) -> bool:
-        lower_url = url.lower()
-        lower_title = title.lower()
-
-        if not title or len(title) < 4:
-            return False
-        if not any(domain in lower_url for domain in SIEMENS_JOB_DOMAINS):
-            return False
-        if any(skip in lower_url for skip in ("login", "linkedin", "instagram", "youtube", "privacy", "terms")):
-            return False
-        if lower_title in {"search", "job search", "jobs", "careers", "back", "next", "previous", "apply now"}:
-            return False
-
-        return any(marker in lower_url for marker in ("job", "career", "position", "vacancy", "requisition"))
-
-    @staticmethod
-    def _extract_location(text: str) -> str:
-        labels = ("Location", "Standort", "City", "Ort", "Country/Region", "Office")
-        lower_text = text.lower()
-        for label in labels:
-            marker = f"{label}:"
-            if marker.lower() in lower_text:
-                start = lower_text.find(marker.lower()) + len(marker)
-                return text[start:].split("|", 1)[0].split("\n", 1)[0].strip()
-
-        location_tokens = (
-            "Munich",
-            "Muenchen",
-            "Berlin",
-            "Hamburg",
-            "Frankfurt",
-            "Stuttgart",
-            "Walldorf",
-            "Germany",
-            "Deutschland",
-        )
-        for token in location_tokens:
-            match = re.search(token, text, re.IGNORECASE)
-            if match:
-                return text[match.start():].split("|", 1)[0].split("\n", 1)[0].split(",", 1)[0].strip()
-
-        return ""
-
-    @staticmethod
-    def _extract_date_posted(text: str) -> str | None:
-        labels = ("Date Posted:", "Posted:", "Publication Date:", "Published:", "Posting Date:")
-        lower_text = text.lower()
-        for label in labels:
-            marker = label.lower()
-            if marker not in lower_text:
-                continue
-            start = lower_text.find(marker) + len(marker)
-            value = text[start:].strip().split(" ", 1)[0]
-            return value or None
-        return None
-
-    @staticmethod
-    def _dedupe_by_url(jobs: list[Job]) -> list[Job]:
-        deduped = []
-        seen_urls = set()
-        for job in jobs:
-            if job.url in seen_urls:
-                continue
-            deduped.append(job)
-            seen_urls.add(job.url)
-        return deduped
+        return {"location": location, "description": text}
 
 
 if __name__ == "__main__":
     collector = SiemensCollector(filter_keywords=False)
     found_jobs = collector.collect()
     for found_job in found_jobs:
-        print(f"{found_job.title} | {found_job.company} | {found_job.url}")
+        print(f"{found_job.title} | {found_job.location} | {found_job.url}")
     print(f"Total: {len(found_jobs)}")
