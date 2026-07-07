@@ -297,7 +297,96 @@ def render_settings_view(config: dict, store: JobStore) -> None:
     st.caption(f"Database: `{db_path}` - {total_jobs} jobs stored")
 
     st.divider()
+    render_board_management(config)
+
+    st.divider()
     render_collection_health(RunTracker(store.connection))
+
+
+BOARD_API_TEMPLATES = {
+    "greenhouse": "https://boards-api.greenhouse.io/v1/boards/{slug}/jobs",
+    "lever": "https://api.lever.co/v0/postings/{slug}?mode=json",
+    "ashby": "https://api.ashbyhq.com/posting-api/job-board/{slug}",
+}
+
+
+def _verify_board_slug(platform: str, slug: str) -> tuple[bool, str]:
+    import requests
+
+    url = BOARD_API_TEMPLATES[platform].format(slug=slug)
+    try:
+        response = requests.get(
+            url,
+            headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"},
+            timeout=15,
+        )
+    except requests.RequestException as exc:
+        return False, f"Request failed: {exc}"
+    if response.status_code != 200:
+        return False, f"HTTP {response.status_code} - slug probably wrong"
+    payload = response.json()
+    count = len(payload) if isinstance(payload, list) else len(payload.get("jobs", []))
+    return True, f"{count} live jobs"
+
+
+def render_board_management(config: dict) -> None:
+    st.subheader("ATS boards")
+    st.caption(
+        "Companies on Greenhouse/Lever/Ashby are config entries - no code needed. "
+        "Restart the scheduler after changes."
+    )
+
+    for platform in BOARD_API_TEMPLATES:
+        boards = config["collectors"].get(platform, {}).get("boards") or []
+        for board in boards:
+            columns = st.columns([3, 4, 1])
+            columns[0].write(f"`{platform}` **{board.get('company', board['slug'])}**")
+            columns[1].caption(
+                f"slug: {board['slug']}"
+                + (f" | locations: {', '.join(board['locations'])}" if board.get("locations") else "")
+            )
+            if columns[2].button("Remove", key=f"remove-{platform}-{board['slug']}"):
+                boards.remove(board)
+                save_config(config)
+                st.rerun()
+
+    with st.form("add-board-form"):
+        columns = st.columns([2, 2, 2, 3])
+        platform = columns[0].selectbox("Platform", list(BOARD_API_TEMPLATES))
+        slug = columns[1].text_input("Slug", help="e.g. anthropic")
+        company = columns[2].text_input("Company name")
+        locations_raw = columns[3].text_input(
+            "Locations filter (optional)",
+            help="Comma-separated substrings, e.g. germany, remote, london",
+        )
+        submitted = st.form_submit_button("Verify and add")
+
+    if submitted:
+        slug = slug.strip().lower()
+        if not slug:
+            st.error("Slug is required.")
+            return
+        ok, detail = _verify_board_slug(platform, slug)
+        if not ok:
+            st.error(f"Board '{slug}' not found on {platform}: {detail}")
+            return
+
+        platform_config = config["collectors"].setdefault(
+            platform, {"enabled": True, "boards": []}
+        )
+        boards = platform_config.setdefault("boards", [])
+        if any(board["slug"] == slug for board in boards):
+            st.warning(f"'{slug}' is already configured on {platform}.")
+            return
+
+        entry: dict = {"slug": slug, "company": company.strip() or slug.title()}
+        locations = [part.strip() for part in locations_raw.split(",") if part.strip()]
+        if locations:
+            entry["locations"] = locations
+        boards.append(entry)
+        platform_config["enabled"] = True
+        save_config(config)
+        st.success(f"Added {entry['company']} ({platform}/{slug}) - {detail}.")
 
 
 STATUS_ICONS = {"ok": "🟢", "warning": "🟡", "error": "🔴", "running": "⏳"}
