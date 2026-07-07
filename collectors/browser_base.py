@@ -265,7 +265,7 @@ class PlaywrightCollectorBase:
                     anchor;
                 return {
                     // Card-style anchors wrap the whole card; the first line is the title.
-                    title: (anchor.innerText || anchor.textContent || "").trim().split("\n")[0].trim(),
+                    title: (anchor.innerText || anchor.textContent || "").trim().split("\\n")[0].trim(),
                     url: anchor.href || anchor.getAttribute("href") || "",
                     text: (container.innerText || "").trim()
                 };
