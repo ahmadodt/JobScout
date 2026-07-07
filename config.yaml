@@ -20,6 +20,7 @@ collectors:
     enabled: false
   bmw:
     enabled: true
+    max_pages: 50  # "load more" clicks; recency cutoff usually stops it earlier
   porsche:
     enabled: true
   mercedes_benz:

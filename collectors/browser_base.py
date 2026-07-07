@@ -35,6 +35,9 @@ class PlaywrightCollectorBase:
     name = "browser"
     company = ""
     search_urls: tuple[str, ...] = ()
+    # Alternative to search_urls: templates with a {keyword} placeholder,
+    # expanded once per configured keyword.
+    search_url_templates: tuple[str, ...] = ()
     job_url_domains: tuple[str, ...] = ()
     job_url_markers: tuple[str, ...] = (
         "job",
@@ -99,10 +102,11 @@ class PlaywrightCollectorBase:
             detail_page = context.new_page()
 
             try:
-                for search_url in self.search_urls:
+                for search_url in self.build_search_urls():
                     try:
                         self._goto_with_retry(page, search_url, self.timeout_ms)
                         self._wait_for_job_content(page, PlaywrightTimeoutError)
+                        self.after_search_load(page, PlaywrightTimeoutError)
                     except Exception:
                         self.logger.warning(
                             "failed to open search page %s", search_url, exc_info=True
@@ -135,6 +139,18 @@ class PlaywrightCollectorBase:
 
     # ------------------------------------------------------------------
     # Hooks for subclasses
+
+    def build_search_urls(self) -> list[str]:
+        if self.search_url_templates:
+            return [
+                template.format(keyword=keyword)
+                for template in self.search_url_templates
+                for keyword in self.keywords
+            ]
+        return list(self.search_urls)
+
+    def after_search_load(self, page, timeout_error) -> None:
+        """Runs once per search page after it loads (e.g. bump page size)."""
 
     def paginate(self, page, timeout_error) -> bool:
         """Advance to the next page of results. Return False when done."""
