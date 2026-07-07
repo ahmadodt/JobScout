@@ -42,3 +42,31 @@ collectors:
     enabled: true
   amazon:
     enabled: true
+  # Config-driven ATS boards: add a company by adding a slug here (no code needed).
+  # locations: optional substring allow-list applied to the job's location field.
+  # Not on these platforms (verified 2026-07): deepl, alephalpha, cohere,
+  # huggingface, perplexityai - would need their own collectors.
+  greenhouse:
+    enabled: true
+    boards:
+      - {slug: anthropic, company: Anthropic, locations: [remote, germany, london, zurich, europe]}
+      - {slug: celonis, company: Celonis}
+      - {slug: helsing, company: Helsing}
+      - {slug: parloa, company: Parloa}
+      - {slug: scaleai, company: Scale AI, locations: [remote, germany, london, europe]}
+      - {slug: wayve, company: Wayve}
+      - {slug: deepmind, company: Google DeepMind}
+      - {slug: blackforestlabs, company: Black Forest Labs}
+  lever:
+    enabled: true
+    boards:
+      - {slug: mistral, company: Mistral AI}
+      - {slug: palantir, company: Palantir, locations: [remote, germany, london, europe]}
+  ashby:
+    enabled: true
+    boards:
+      - {slug: openai, company: OpenAI, locations: [remote, germany, london, europe]}
+      - {slug: elevenlabs, company: ElevenLabs}
+      - {slug: langchain, company: LangChain}
+      - {slug: n8n, company: n8n}
+      - {slug: weaviate, company: Weaviate}
