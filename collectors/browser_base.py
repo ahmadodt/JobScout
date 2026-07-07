@@ -22,6 +22,12 @@ DEFAULT_USER_AGENT = (
     "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 )
 RETRY_BACKOFF_SECONDS = 2.0
+MAX_LOCATION_LENGTH = 80
+
+
+def _plausible_location(candidate: str) -> str:
+    """A 'location' longer than a street address is scraped page text, not a place."""
+    return candidate if len(candidate) <= MAX_LOCATION_LENGTH else ""
 
 
 class PlaywrightCollectorBase:
@@ -258,7 +264,8 @@ class PlaywrightCollectorBase:
                     anchor.closest("article, li, tr, [role='listitem'], [data-testid*='job'], .job, [class*='job'], [class*='result'], [class*='card']") ||
                     anchor;
                 return {
-                    title: (anchor.innerText || anchor.textContent || "").trim(),
+                    // Card-style anchors wrap the whole card; the first line is the title.
+                    title: (anchor.innerText || anchor.textContent || "").trim().split("\n")[0].trim(),
                     url: anchor.href || anchor.getAttribute("href") || "",
                     text: (container.innerText || "").trim()
                 };
@@ -338,7 +345,8 @@ class PlaywrightCollectorBase:
             marker = f"{label}:"
             if marker.lower() in lower_text:
                 start = lower_text.find(marker.lower()) + len(marker)
-                return text[start:].split("|", 1)[0].split("\n", 1)[0].strip()
+                candidate = text[start:].split("|", 1)[0].split("\n", 1)[0].strip()
+                return _plausible_location(candidate)
 
         location_tokens = (
             "Munich",
@@ -354,13 +362,14 @@ class PlaywrightCollectorBase:
         for token in location_tokens:
             match = re.search(token, text, re.IGNORECASE)
             if match:
-                return (
+                candidate = (
                     text[match.start():]
                     .split("|", 1)[0]
                     .split("\n", 1)[0]
                     .split(",", 1)[0]
                     .strip()
                 )
+                return _plausible_location(candidate)
 
         return ""
 
