@@ -21,6 +21,7 @@ from services.personal_connections import (
     find_company_connections,
     load_personal_connections,
 )
+from services.run_tracker import RunTracker
 from services.watchlist import CompanyWatchlist
 
 
@@ -294,6 +295,42 @@ def render_settings_view(config: dict, store: JobStore) -> None:
     db_path = resolve_db_path(config)
     total_jobs = store.connection.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
     st.caption(f"Database: `{db_path}` - {total_jobs} jobs stored")
+
+    st.divider()
+    render_collection_health(RunTracker(store.connection))
+
+
+STATUS_ICONS = {"ok": "🟢", "warning": "🟡", "error": "🔴", "running": "⏳"}
+
+
+def render_collection_health(tracker: RunTracker) -> None:
+    st.subheader("Collection health")
+    rows = tracker.latest_run_per_source()
+    if not rows:
+        st.caption("No collection runs recorded yet - run `python run_collection.py`.")
+        return
+
+    problems = [row for row in rows if row["status"] in ("error", "warning")]
+    if problems:
+        st.warning(f"{len(problems)} collector(s) need attention.")
+    else:
+        st.success("All collectors healthy on their last run.")
+
+    st.dataframe(
+        [
+            {
+                "Status": f"{STATUS_ICONS.get(row['status'], '?')} {row['status']}",
+                "Source": row["source"],
+                "Last run": row["started_at"],
+                "Jobs found": row["jobs_found"],
+                "New jobs": row["jobs_inserted"],
+                "Error": row["error_message"] or "",
+            }
+            for row in rows
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
 
 
 config = load_config()

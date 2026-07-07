@@ -10,6 +10,7 @@ scoring:
 
 collection:
   lookback_days: 30
+  keywords: [rag, llm, agent]
 
 cleanup:
   stale_days: 30

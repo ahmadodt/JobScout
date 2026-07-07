@@ -40,12 +40,21 @@ def send_daily_summary(
     recipient = os.environ["JOBSCOUT_EMAIL_TO"]
     password = os.environ["JOBSCOUT_EMAIL_PASSWORD"]
     top_jobs = _get_top_scoring_jobs()
+    health = _get_collection_health()
+    failures = sum(1 for entry in health if entry["status"] == "error")
+
+    subject = "JobScout daily summary"
+    if failures:
+        plural = "s" if failures != 1 else ""
+        subject += f" - {failures} collector failure{plural}"
 
     message = EmailMessage()
-    message["Subject"] = "JobScout daily summary"
+    message["Subject"] = subject
     message["From"] = sender
     message["To"] = recipient
-    message.set_content(_build_summary_body(new_jobs_count, scored_jobs_count, top_jobs))
+    message.set_content(
+        _build_summary_body(new_jobs_count, scored_jobs_count, top_jobs, health)
+    )
 
     try:
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as smtp:
@@ -64,6 +73,7 @@ def _build_summary_body(
     new_jobs_count: int,
     scored_jobs_count: int,
     top_jobs: list[dict[str, str | int | None]],
+    health: list[dict[str, str | int | None]] | None = None,
 ) -> str:
     lines = [
         "JobScout daily summary",
@@ -86,7 +96,38 @@ def _build_summary_body(
                 ]
             )
 
+    if health:
+        lines.extend(["", "Collector health (today's runs):"])
+        for entry in health:
+            if entry["status"] == "error":
+                lines.append(f"[FAILED] {entry['source']}: {entry['error_message']}")
+            elif entry["status"] == "warning":
+                lines.append(
+                    f"[WARN 0 jobs] {entry['source']}: returned no jobs "
+                    "despite recent successful runs"
+                )
+            else:
+                lines.append(
+                    f"[OK] {entry['source']}: {entry['jobs_found']} found, "
+                    f"{entry['jobs_inserted']} new"
+                )
+
     return "\n".join(lines)
+
+
+def _get_collection_health() -> list[dict[str, str | int | None]]:
+    connection = connect(_get_db_path())
+    init_db(connection)
+    rows = connection.execute(
+        """
+        SELECT source, status, jobs_found, jobs_inserted, error_message
+        FROM collection_runs
+        WHERE started_at >= date('now')
+        ORDER BY source, started_at
+        """
+    ).fetchall()
+    connection.close()
+    return [dict(row) for row in rows]
 
 
 def _get_top_scoring_jobs() -> list[dict[str, str | int | None]]:

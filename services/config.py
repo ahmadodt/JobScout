@@ -13,9 +13,13 @@ DEFAULTS: dict = {
     "database": {"path": "jobscout.sqlite3"},
     "schedule": {"collection_time": "08:00", "scoring_time": "08:30"},
     "scoring": {"ai_enabled": False},
-    "collection": {"lookback_days": 30},
+    "collection": {"lookback_days": 30, "keywords": ["rag", "llm", "agent"]},
     "cleanup": {"stale_days": 30},
-    "collectors": {},
+    "collectors": {
+        "greenhouse": {"enabled": False, "boards": []},
+        "lever": {"enabled": False, "boards": []},
+        "ashby": {"enabled": False, "boards": []},
+    },
 }
 
 
